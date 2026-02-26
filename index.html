@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rifa - iPhone 17 Pro Max 256GB Laranja</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-bg"></div>
+
+    <main class="app">
+      <section class="card hero-card">
+        <div class="hero-image-wrap">
+          <img
+            class="hero-image"
+            src="https://images.unsplash.com/photo-1764746128564-ddaa23d5d8f8?q=80&w=2071&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+            alt="prêmio"
+          />
+          <div class="hero-overlay"></div>
+          <div class="hero-brand">@OUTLETAPPLE1</div>
+        </div>
+
+        <div class="hero-content">
+          <div class="hero-tags">
+            <span class="tag">PARTICIPE AGORA!</span>
+            <span class="tag">APENAS R$ 1,99</span>
+          </div>
+          <h1>iPhone 17 Pro Max 256GB - Laranja</h1>
+          <p>Compre bilhetes e concorra</p>
+          <small>Sorteio: Loteria Federal</small>
+
+          <button id="myTicketsBtn" class="link-button" type="button">Meus bilhetes</button>
+        </div>
+      </section>
+
+      <section class="card selector-card">
+        <h2>Selecione a quantidade</h2>
+        <div id="quickButtons" class="quick-grid"></div>
+
+        <div class="counter-row">
+          <button id="minusBtn" class="counter-btn" type="button">−</button>
+          <span id="qtyValue" class="counter-value">5</span>
+          <button id="plusBtn" class="counter-btn" type="button">+</button>
+          <button id="participarBtn" class="cta" type="button">Participar R$ 9,95</button>
+        </div>
+        <p id="minPurchaseHint" class="hint"></p>
+      </section>
+
+      <section class="card rules-card">
+        <button id="rulesToggle" class="rules-toggle" type="button">
+          Ver o regulamento <span id="rulesArrow">▾</span>
+        </button>
+        <div id="rulesContent" class="rules-content">
+          <p>
+            Este bilhete de loteria está autorizado conforme regulamento da promoção. Proibido para menores de 18
+            anos.
+          </p>
+          <p>
+            Consulte os termos antes de contratar. Ao contribuir, o titular concorda com uso de nome, voz e imagem na
+            divulgação da campanha.<br>
+            ATENÇÃO: A data do sorteio será divulgada próximo do término da venda dos números. Faltando em torno de 15% para esgotar,
+            divulgamos a data que será realizado.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <aside id="checkoutPanel" class="checkout-panel" aria-hidden="true">
+      <div class="checkout-header">
+        <button id="backBtn" class="icon-btn" type="button">‹</button>
+        <h3>Checkout</h3>
+        <span class="header-spacer"></span>
+      </div>
+
+      <div class="checkout-body">
+        <div id="summaryBox" class="summary-box">
+          • Você está adquirindo <b><span id="summaryQty">5</span></b> unidades do produto
+          <b>Performance que Impõe Respeito - Macan T</b><br />
+          Valor total: <b>R$ <span id="summaryTotal">9,95</span></b>
+        </div>
+
+        <section id="stepPhone" class="step active">
+          <label for="phoneInput">Informe seu telefone</label>
+          <input id="phoneInput" type="tel" placeholder="+55 (00) 00000-0000" />
+          <p class="terms">
+            Ao efetuar este pagamento e confirmar a compra, declaro que li e concordo com os <a href="#">termos</a>.
+          </p>
+          <button id="phoneContinue" class="cta full" type="button">Concluir reserva →</button>
+        </section>
+
+        <section id="stepExisting" class="step">
+          <div class="user-card">
+            <div class="avatar"></div>
+            <div>
+              <strong id="existingName">Igor Caruso Miranda</strong>
+              <p id="existingPhone">+55 35 99170 0750</p>
+            </div>
+          </div>
+          <p class="terms">
+            Conta ativa encontrada. Você pode seguir direto para o pagamento da sua reserva.
+          </p>
+          <button id="existingContinue" class="cta full" type="button">Concluir reserva →</button>
+        </section>
+
+        <section id="stepRegister" class="step">
+          <label for="nameInput">Nome completo*</label>
+          <input id="nameInput" type="text" placeholder="Seu nome" />
+
+          <label for="cpfInput">CPF*</label>
+          <input id="cpfInput" type="text" placeholder="000.000.000-00" />
+
+          <label for="emailInput">Informe seu email</label>
+          <input id="emailInput" type="email" placeholder="voce@email.com" />
+
+          <label for="phoneConfirmInput">Confirme seu telefone</label>
+          <input id="phoneConfirmInput" type="tel" placeholder="+55 (00) 00000-0000" />
+
+          <label for="birthInput">Data de nascimento (DD/MM/AAAA)</label>
+          <input id="birthInput" type="text" placeholder="00/00/0000" />
+
+          <p class="terms">Preencha os dados para criar sua conta e seguir ao pagamento.</p>
+          <button id="registerContinue" class="cta full" type="button">Concluir reserva →</button>
+        </section>
+
+        <section id="stepPayment" class="step">
+          <div class="timer-icon">⌛</div>
+          <h4>Aguardando pagamento!</h4>
+          <p class="timer-text">Você tem <span id="countdown" class="timer-pill">00:09:40</span> para pagar</p>
+
+          <label for="pixCodeInput">Copie o código pix abaixo</label>
+          <div class="pix-row">
+            <input id="pixCodeInput" readonly />
+            <button id="copyPixBtn" class="copy-btn" type="button">Copiar</button>
+          </div>
+
+          <p class="instructions">
+            Abra o app do seu banco e escolha PIX copia e cola para confirmar o pagamento.
+          </p>
+
+          <div class="qr-wrap">
+            <img id="qrImage" alt="QR code PIX" />
+          </div>
+
+          <div class="warning-box">
+            Este pagamento só pode ser realizado dentro do tempo. Após este período, os títulos voltam a ficar
+            disponíveis.
+          </div>
+
+          <p class="already-paid">Já realizou o pagamento?</p>
+          <button id="verifyStatusBtn" class="cta full" type="button">Verificar status da compra</button>
+          <p id="statusMessage" class="status-message"></p>
+
+          <div class="purchase-card">
+            <div class="purchase-line"><b id="purchaseName">Cliente</b><span id="purchasePhone">+55</span></div>
+            <div class="purchase-line"><span>Forma de pagamento</span><span>PIX</span></div>
+            <div class="purchase-line"><span>Data da compra</span><span id="purchaseDate"></span></div>
+            <div class="purchase-line">
+              <span>Valor total da compra</span><span>R$ <span id="purchaseTotal">9,95</span></span>
+            </div>
+          </div>
+        </section>
+
+        <section id="stepSuccess" class="step">
+          <div class="success-head">
+            <div class="success-icon">✓</div>
+            <h4>Pagamento identificado!</h4>
+            <p>Seu pagamento foi aprovado</p>
+          </div>
+
+          <h5 class="success-title">Detalhes da compra</h5>
+          <div id="successDetails" class="purchase-card"></div>
+
+          <div class="success-ticket-head">
+            <strong>Bilhetes (<span id="successTicketCount">0</span>)</strong>
+            <span>Ordem crescente</span>
+          </div>
+          <div id="successTickets" class="ticket-grid"></div>
+
+          <button id="successMyTicketsBtn" class="cta full" type="button">Ir para meus bilhetes</button>
+        </section>
+      </div>
+    </aside>
+
+    <div id="lookupOverlay" class="overlay" aria-hidden="true">
+      <div class="lookup-modal">
+        <div class="lookup-head">
+          <strong>Consulte sua compra</strong>
+          <button id="closeLookupBtn" class="icon-btn" type="button">×</button>
+        </div>
+
+        <div class="lookup-tabs">
+          <button class="tab active" data-method="phone" type="button">Por celular</button>
+          <button class="tab" data-method="email" type="button">Por email</button>
+          <button class="tab" data-method="cpf" type="button">Por CPF</button>
+        </div>
+
+        <label id="lookupLabel" for="lookupInput">Celular com DDD</label>
+        <input id="lookupInput" type="text" placeholder="+55 (00) 00000-0000" />
+
+        <button id="lookupContinueBtn" class="cta full" type="button">Continuar →</button>
+        <p id="lookupMessage" class="status-message"></p>
+
+        <section id="lookupResult" class="lookup-result"></section>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

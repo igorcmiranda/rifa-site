@@ -1,0 +1,153 @@
+{
+  "adminCpfs": [
+    "45235958870"
+  ],
+  "raffle": {
+    "totalTickets": 99999
+  },
+  "users": [
+    {
+      "id": "user-b46d7f0e-72d1-4651-bf8c-e02c93a19149",
+      "name": "Igor",
+      "phone": "+55 (19) 99996-3934",
+      "cpf": "00049460650",
+      "email": "igor@gmail.com",
+      "birthDate": "12/03/2001",
+      "updatedAt": "2026-02-26T13:02:10.830Z",
+      "createdAt": "2026-02-26T12:15:23.673Z"
+    },
+    {
+      "id": "user-d5ce7244-9886-4f11-a88a-3cd41a5d61b6",
+      "name": "PEdro Miranda",
+      "phone": "+55 (35) 99730-1234",
+      "cpf": "00049460650",
+      "email": "pedro@gmail.com",
+      "birthDate": "01/08/2001",
+      "updatedAt": "2026-02-26T12:16:22.348Z",
+      "createdAt": "2026-02-26T12:16:22.348Z"
+    }
+  ],
+  "charges": [
+    {
+      "id": "charge-d735b65c-ec8c-488e-901f-3b8aa4d516d9",
+      "transactionId": "txe69b1715e6984990",
+      "userId": "user-b46d7f0e-72d1-4651-bf8c-e02c93a19149",
+      "amount": 9.95,
+      "quantity": 5,
+      "description": "Performance que Impoe Respeito - Macan T",
+      "status": "paid",
+      "pixCode": "00020126580014br.gov.bcb.pix0136rifa.exemplo/17721081236735204000053039865802BR5925Igor Miranda            6008BRASILIA62070503***6304ABCD",
+      "qrCodeImage": "https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=00020126580014br.gov.bcb.pix0136rifa.exemplo%2F17721081236735204000053039865802BR5925Igor%20Miranda%20%20%20%20%20%20%20%20%20%20%20%206008BRASILIA62070503***6304ABCD",
+      "createdAt": "2026-02-26T12:15:23.673Z",
+      "expiresAt": "2026-02-26T12:25:03.673Z"
+    },
+    {
+      "id": "charge-a0443d9a-09fe-4afe-90eb-a6bb56382e70",
+      "transactionId": "tx7bdd4cc3e2f14bea",
+      "userId": "user-d5ce7244-9886-4f11-a88a-3cd41a5d61b6",
+      "amount": 9.95,
+      "quantity": 5,
+      "description": "Performance que Impoe Respeito - Macan T",
+      "status": "paid",
+      "pixCode": "00020126580014br.gov.bcb.pix0136rifa.exemplo/17721081823485204000053039865802BR5925PEdro Miranda           6008BRASILIA62070503***6304ABCD",
+      "qrCodeImage": "https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=00020126580014br.gov.bcb.pix0136rifa.exemplo%2F17721081823485204000053039865802BR5925PEdro%20Miranda%20%20%20%20%20%20%20%20%20%20%206008BRASILIA62070503***6304ABCD",
+      "createdAt": "2026-02-26T12:16:22.348Z",
+      "expiresAt": "2026-02-26T12:26:02.348Z"
+    },
+    {
+      "id": "charge-7d59169b-c0a0-4514-9ab8-04a0325cbb05",
+      "transactionId": "txae5a1e902cf34c1d",
+      "userId": "user-b46d7f0e-72d1-4651-bf8c-e02c93a19149",
+      "amount": 9.95,
+      "quantity": 5,
+      "description": "Performance que Impoe Respeito - Macan T",
+      "status": "paid",
+      "pixCode": "00020126580014br.gov.bcb.pix0136rifa.exemplo/17721109308315204000053039865802BR5925Igor                    6008BRASILIA62070503***6304ABCD",
+      "qrCodeImage": "https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=00020126580014br.gov.bcb.pix0136rifa.exemplo%2F17721109308315204000053039865802BR5925Igor%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%206008BRASILIA62070503***6304ABCD",
+      "createdAt": "2026-02-26T13:02:10.830Z",
+      "expiresAt": "2026-02-26T13:11:50.830Z"
+    }
+  ],
+  "purchases": [
+    {
+      "id": "purchase-5cce3388-6167-48ac-ae93-401f48356e0e",
+      "chargeId": "charge-d735b65c-ec8c-488e-901f-3b8aa4d516d9",
+      "transactionId": "txe69b1715e6984990",
+      "userId": "user-b46d7f0e-72d1-4651-bf8c-e02c93a19149",
+      "userName": "Igor Miranda",
+      "cpf": "14169458656",
+      "email": "igor@gmail.com",
+      "phone": "+55 (35) 99730-3110",
+      "amount": 9.95,
+      "quantity": 5,
+      "status": "paid",
+      "createdAt": "2026-02-26T12:15:29.434Z",
+      "tickets": [
+        "64258",
+        "24819",
+        "54967",
+        "08085",
+        "93410"
+      ]
+    },
+    {
+      "id": "purchase-632781cb-f0b0-4445-b3eb-3edfda68e826",
+      "chargeId": "charge-a0443d9a-09fe-4afe-90eb-a6bb56382e70",
+      "transactionId": "tx7bdd4cc3e2f14bea",
+      "userId": "user-d5ce7244-9886-4f11-a88a-3cd41a5d61b6",
+      "userName": "PEdro Miranda",
+      "cpf": "00049460650",
+      "email": "pedro@gmail.com",
+      "phone": "+55 (35) 99730-1234",
+      "amount": 9.95,
+      "quantity": 5,
+      "status": "paid",
+      "createdAt": "2026-02-26T12:16:23.947Z",
+      "tickets": [
+        "28329",
+        "48139",
+        "57838",
+        "48027",
+        "91811"
+      ]
+    },
+    {
+      "id": "purchase-1d2c3f0d-bcb5-4e78-82b0-7a73a8f63701",
+      "chargeId": "charge-7d59169b-c0a0-4514-9ab8-04a0325cbb05",
+      "transactionId": "txae5a1e902cf34c1d",
+      "userId": "user-b46d7f0e-72d1-4651-bf8c-e02c93a19149",
+      "userName": "Igor",
+      "cpf": "00049460650",
+      "email": "igor@gmail.com",
+      "phone": "+55 (19) 99996-3934",
+      "amount": 9.95,
+      "quantity": 5,
+      "status": "paid",
+      "createdAt": "2026-02-26T13:02:12.254Z",
+      "tickets": [
+        "89405",
+        "98390",
+        "88572",
+        "28721",
+        "57110"
+      ]
+    }
+  ],
+  "usedTickets": [
+    "64258",
+    "24819",
+    "54967",
+    "08085",
+    "93410",
+    "28329",
+    "48139",
+    "57838",
+    "48027",
+    "91811",
+    "89405",
+    "98390",
+    "88572",
+    "28721",
+    "57110"
+  ]
+}

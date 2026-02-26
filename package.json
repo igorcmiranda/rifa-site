@@ -1,0 +1,13 @@
+{
+  "name": "rifa-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site de rifa com checkout e painel admin",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
