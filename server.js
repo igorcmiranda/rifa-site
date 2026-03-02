@@ -108,12 +108,7 @@ async function createMercadoPagoPixPayment({ externalReference, amount, descript
     ? buyerEmail
     : isValidEmail(MP_PAYER_EMAIL)
       ? normalizeEmail(MP_PAYER_EMAIL)
-      : "";
-  if (!email) {
-    const error = new Error("PAYER_EMAIL_REQUIRED");
-    error.code = "PAYER_EMAIL_REQUIRED";
-    throw error;
-  }
+      : `comprador.${Date.now()}@example.com`;
   const { firstName, lastName } = splitName(buyer.name || "Cliente");
 
   const payload = {
@@ -747,7 +742,6 @@ async function createCharge({ amount, quantity, buyer, description }) {
         if (
           error.code === "MP_API_ERROR" ||
           error.code === "MP_NOT_CONFIGURED" ||
-          error.code === "PAYER_EMAIL_REQUIRED" ||
           error.code === "PIX_DATA_MISSING"
         ) {
           throw new Error("MP_CREATE_PIX_FAILED");

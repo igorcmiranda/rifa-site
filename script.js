@@ -72,6 +72,7 @@ const lookupInput = document.getElementById("lookupInput");
 const lookupContinueBtn = document.getElementById("lookupContinueBtn");
 const lookupMessage = document.getElementById("lookupMessage");
 const lookupResult = document.getElementById("lookupResult");
+const checkoutActionMessage = document.getElementById("checkoutActionMessage");
 
 let quantity = minimumPurchase;
 let timerId;
@@ -147,6 +148,12 @@ function setLookupMessage(message, type = "") {
   if (type) lookupMessage.classList.add(type);
 }
 
+function setCheckoutMessage(message, type = "") {
+  checkoutActionMessage.textContent = message;
+  checkoutActionMessage.className = "status-message";
+  if (type) checkoutActionMessage.classList.add(type);
+}
+
 function setStep(stepId) {
   document.querySelectorAll(".step").forEach((el) => el.classList.remove("active"));
   document.getElementById(stepId).classList.add("active");
@@ -172,6 +179,7 @@ function openCheckout() {
 
   checkoutPanel.classList.add("open");
   checkoutPanel.setAttribute("aria-hidden", "false");
+  setCheckoutMessage("");
   setStep("stepPhone");
   phoneInput.focus();
 }
@@ -179,6 +187,7 @@ function openCheckout() {
 function closeCheckout() {
   checkoutPanel.classList.remove("open");
   checkoutPanel.setAttribute("aria-hidden", "true");
+  setCheckoutMessage("");
   clearInterval(timerId);
 }
 
@@ -410,9 +419,20 @@ async function createPixCharge(user) {
 }
 
 async function showPayment(user) {
+  const prevExistingText = existingContinue.textContent;
+  const prevRegisterText = registerContinue.textContent;
   try {
+    setCheckoutMessage("Gerando PIX...", "pending");
+    existingContinue.disabled = true;
+    registerContinue.disabled = true;
+    existingContinue.textContent = "Gerando...";
+    registerContinue.textContent = "Gerando...";
+
     const total = quantity * ticketPrice;
     const charge = await createPixCharge(user);
+    if (!charge?.pixCode || !charge?.qrCodeImage) {
+      throw new Error("PIX nao retornou dados validos.");
+    }
 
     activeCharge = {
       id: charge.id,
@@ -447,10 +467,17 @@ async function showPayment(user) {
 
     purchaseTotal.textContent = money(total);
     setStatus("");
+    setCheckoutMessage("");
     setStep("stepPayment");
     startCountdown(Number(charge.expiresInSeconds) || 580);
   } catch (error) {
+    setCheckoutMessage(error.message || "Nao foi possivel criar a cobranca PIX.", "error");
     alert(error.message || "Nao foi possivel criar a cobranca PIX.");
+  } finally {
+    existingContinue.disabled = false;
+    registerContinue.disabled = false;
+    existingContinue.textContent = prevExistingText;
+    registerContinue.textContent = prevRegisterText;
   }
 }
 
