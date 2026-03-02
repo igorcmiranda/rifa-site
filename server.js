@@ -13,6 +13,7 @@ const CHARGE_EXPIRES_SECONDS = 9 * 60 + 40;
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || "";
 const MP_API_BASE = process.env.MP_API_BASE || "https://api.mercadopago.com";
 const MP_NOTIFICATION_URL = process.env.MP_NOTIFICATION_URL || "";
+const MP_PAYER_EMAIL = process.env.MP_PAYER_EMAIL || "";
 
 function onlyDigits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -47,6 +48,10 @@ function splitName(fullName) {
   if (!parts.length) return { firstName: "Cliente", lastName: "Rifa" };
   if (parts.length === 1) return { firstName: parts[0], lastName: "Rifa" };
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function toSqlDateTime(iso) {
@@ -98,7 +103,17 @@ async function mercadoPagoRequest(pathname, options = {}) {
 
 async function createMercadoPagoPixPayment({ externalReference, amount, description, buyer }) {
   const cpf = onlyDigits(buyer.cpf || "");
-  const email = normalizeEmail(buyer.email) || `${externalReference}@rifa.local`;
+  const buyerEmail = normalizeEmail(buyer.email);
+  const email = isValidEmail(buyerEmail)
+    ? buyerEmail
+    : isValidEmail(MP_PAYER_EMAIL)
+      ? normalizeEmail(MP_PAYER_EMAIL)
+      : "";
+  if (!email) {
+    const error = new Error("PAYER_EMAIL_REQUIRED");
+    error.code = "PAYER_EMAIL_REQUIRED";
+    throw error;
+  }
   const { firstName, lastName } = splitName(buyer.name || "Cliente");
 
   const payload = {
@@ -136,6 +151,17 @@ async function createMercadoPagoPixPayment({ externalReference, amount, descript
   const qrCodeBase64 = payment?.point_of_interaction?.transaction_data?.qr_code_base64 || "";
   const qrCodeImage = qrCodeBase64 ? `data:image/png;base64,${qrCodeBase64}` : "";
   const expirationDate = payment?.date_of_expiration || null;
+
+  if (!qrCode || !qrCodeImage) {
+    const error = new Error("PIX_DATA_MISSING");
+    error.code = "PIX_DATA_MISSING";
+    error.details = {
+      paymentId: payment?.id || null,
+      status: payment?.status || null,
+      statusDetail: payment?.status_detail || null
+    };
+    throw error;
+  }
 
   return {
     mpPaymentId: String(payment.id),
@@ -718,7 +744,12 @@ async function createCharge({ amount, quantity, buyer, description }) {
         charge.mpPaymentId = mpCharge.mpPaymentId;
         charge.mpStatus = mpCharge.mpStatus;
       } catch (error) {
-        if (error.code === "MP_API_ERROR" || error.code === "MP_NOT_CONFIGURED") {
+        if (
+          error.code === "MP_API_ERROR" ||
+          error.code === "MP_NOT_CONFIGURED" ||
+          error.code === "PAYER_EMAIL_REQUIRED" ||
+          error.code === "PIX_DATA_MISSING"
+        ) {
           throw new Error("MP_CREATE_PIX_FAILED");
         }
         throw error;
@@ -1036,7 +1067,10 @@ async function handleApi(req, res, url) {
         return json(res, 409, { error: "Quantidade indisponivel. Limite de numeros da rifa atingido." });
       }
       if (error.message === "MP_CREATE_PIX_FAILED") {
-        return json(res, 502, { error: "Falha ao gerar PIX no Mercado Pago." });
+        return json(res, 502, {
+          error:
+            "Falha ao gerar PIX no Mercado Pago. Verifique MP_ACCESS_TOKEN e um e-mail de pagador valido (MP_PAYER_EMAIL)."
+        });
       }
       throw error;
     }
