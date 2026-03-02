@@ -10,6 +10,9 @@ const ROOT = __dirname;
 
 const MIN_PURCHASE = 5;
 const CHARGE_EXPIRES_SECONDS = 9 * 60 + 40;
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || "";
+const MP_API_BASE = process.env.MP_API_BASE || "https://api.mercadopago.com";
+const MP_NOTIFICATION_URL = process.env.MP_NOTIFICATION_URL || "";
 
 function onlyDigits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -37,6 +40,121 @@ function createTransactionCode() {
 function createPixCode(name) {
   const safeName = String(name || "Cliente").slice(0, 24).padEnd(24, " ");
   return `00020126580014br.gov.bcb.pix0136rifa.exemplo/${Date.now()}5204000053039865802BR5925${safeName}6008BRASILIA62070503***6304ABCD`;
+}
+
+function splitName(fullName) {
+  const parts = String(fullName || "Cliente").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: "Cliente", lastName: "Rifa" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "Rifa" };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+function toSqlDateTime(iso) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function mapMpStatus(mpStatus, expirationDate) {
+  const status = String(mpStatus || "").toLowerCase();
+  if (status === "approved") return "paid";
+  if (status === "cancelled" || status === "rejected" || status === "refunded" || status === "charged_back") {
+    return "cancelled";
+  }
+  if (expirationDate && Date.now() > new Date(expirationDate).getTime()) {
+    return "expired";
+  }
+  return "pending";
+}
+
+async function mercadoPagoRequest(pathname, options = {}) {
+  if (!MP_ACCESS_TOKEN) {
+    throw new Error("MP_NOT_CONFIGURED");
+  }
+
+  const headers = {
+    Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+
+  const response = await fetch(`${MP_API_BASE}${pathname}`, {
+    method: options.method || "GET",
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const cause = data?.message || data?.error || "Falha na API do Mercado Pago.";
+    const error = new Error(cause);
+    error.code = "MP_API_ERROR";
+    error.details = data;
+    throw error;
+  }
+  return data;
+}
+
+async function createMercadoPagoPixPayment({ externalReference, amount, description, buyer }) {
+  const cpf = onlyDigits(buyer.cpf || "");
+  const email = normalizeEmail(buyer.email) || `${externalReference}@rifa.local`;
+  const { firstName, lastName } = splitName(buyer.name || "Cliente");
+
+  const payload = {
+    transaction_amount: Number(amount.toFixed(2)),
+    description,
+    payment_method_id: "pix",
+    external_reference: externalReference,
+    payer: {
+      email,
+      first_name: firstName,
+      last_name: lastName
+    }
+  };
+
+  if (cpf.length === 11) {
+    payload.payer.identification = {
+      type: "CPF",
+      number: cpf
+    };
+  }
+
+  if (MP_NOTIFICATION_URL) {
+    payload.notification_url = MP_NOTIFICATION_URL;
+  }
+
+  const payment = await mercadoPagoRequest("/v1/payments", {
+    method: "POST",
+    headers: {
+      "X-Idempotency-Key": createId("idem")
+    },
+    body: payload
+  });
+
+  const qrCode = payment?.point_of_interaction?.transaction_data?.qr_code || "";
+  const qrCodeBase64 = payment?.point_of_interaction?.transaction_data?.qr_code_base64 || "";
+  const qrCodeImage = qrCodeBase64 ? `data:image/png;base64,${qrCodeBase64}` : "";
+  const expirationDate = payment?.date_of_expiration || null;
+
+  return {
+    mpPaymentId: String(payment.id),
+    mpStatus: String(payment.status || "pending"),
+    status: mapMpStatus(payment.status, expirationDate),
+    pixCode: qrCode,
+    qrCodeImage,
+    expiresAt: toSqlDateTime(expirationDate)
+  };
+}
+
+async function getMercadoPagoPaymentStatus(mpPaymentId) {
+  const payment = await mercadoPagoRequest(`/v1/payments/${encodeURIComponent(mpPaymentId)}`);
+  const expirationDate = payment?.date_of_expiration || null;
+  return {
+    mpStatus: String(payment.status || "pending"),
+    status: mapMpStatus(payment.status, expirationDate),
+    expiresAt: toSqlDateTime(expirationDate)
+  };
 }
 
 function csvEscape(value) {
@@ -274,6 +392,9 @@ async function initDatabase() {
       CONSTRAINT fk_charges_user FOREIGN KEY (user_id) REFERENCES users(id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  await pool.query("ALTER TABLE charges ADD COLUMN IF NOT EXISTS mp_payment_id VARCHAR(64) NULL");
+  await pool.query("ALTER TABLE charges ADD COLUMN IF NOT EXISTS mp_status VARCHAR(40) NULL");
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS purchases (
@@ -553,8 +674,12 @@ async function createCharge({ amount, quantity, buyer, description }) {
 
     const user = await upsertUser(conn, buyer);
     const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + CHARGE_EXPIRES_SECONDS * 1000);
-    const pixCode = createPixCode(user.name);
+    let expiresAt = new Date(createdAt.getTime() + CHARGE_EXPIRES_SECONDS * 1000);
+    let pixCode = createPixCode(user.name);
+    let qrCodeImage = `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(pixCode)}`;
+    let status = "pending";
+    let mpPaymentId = null;
+    let mpStatus = null;
 
     const charge = {
       id: createId("charge"),
@@ -563,16 +688,46 @@ async function createCharge({ amount, quantity, buyer, description }) {
       amount: Number(amount.toFixed(2)),
       quantity,
       description,
-      status: "pending",
+      status,
       pixCode,
-      qrCodeImage: `https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(pixCode)}`,
+      qrCodeImage,
       createdAt,
-      expiresAt
+      expiresAt,
+      mpPaymentId,
+      mpStatus
     };
 
+    if (MP_ACCESS_TOKEN) {
+      try {
+        const mpCharge = await createMercadoPagoPixPayment({
+          externalReference: charge.id,
+          amount: charge.amount,
+          description: charge.description,
+          buyer: {
+            name: user.name,
+            cpf: user.cpf,
+            email: user.email,
+            phone: user.phone
+          }
+        });
+
+        charge.status = mpCharge.status;
+        charge.pixCode = mpCharge.pixCode || charge.pixCode;
+        charge.qrCodeImage = mpCharge.qrCodeImage || charge.qrCodeImage;
+        charge.expiresAt = mpCharge.expiresAt || charge.expiresAt;
+        charge.mpPaymentId = mpCharge.mpPaymentId;
+        charge.mpStatus = mpCharge.mpStatus;
+      } catch (error) {
+        if (error.code === "MP_API_ERROR" || error.code === "MP_NOT_CONFIGURED") {
+          throw new Error("MP_CREATE_PIX_FAILED");
+        }
+        throw error;
+      }
+    }
+
     await conn.query(
-      `INSERT INTO charges (id, transaction_id, user_id, amount, quantity, description, status, pix_code, qr_code_image, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO charges (id, transaction_id, user_id, amount, quantity, description, status, pix_code, qr_code_image, created_at, expires_at, mp_payment_id, mp_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         charge.id,
         charge.transactionId,
@@ -584,7 +739,9 @@ async function createCharge({ amount, quantity, buyer, description }) {
         charge.pixCode,
         charge.qrCodeImage,
         charge.createdAt,
-        charge.expiresAt
+        charge.expiresAt,
+        charge.mpPaymentId,
+        charge.mpStatus
       ]
     );
 
@@ -594,11 +751,29 @@ async function createCharge({ amount, quantity, buyer, description }) {
 
 async function getChargeStatus(chargeId) {
   return withTransaction(async (conn) => {
-    const [rows] = await conn.query("SELECT id, status, expires_at AS expiresAt FROM charges WHERE id = ? LIMIT 1 FOR UPDATE", [
-      chargeId
-    ]);
+    const [rows] = await conn.query(
+      "SELECT id, status, expires_at AS expiresAt, mp_payment_id AS mpPaymentId, mp_status AS mpStatus FROM charges WHERE id = ? LIMIT 1 FOR UPDATE",
+      [chargeId]
+    );
     const charge = rows[0] || null;
     if (!charge) return null;
+
+    if (charge.mpPaymentId && MP_ACCESS_TOKEN) {
+      try {
+        const mp = await getMercadoPagoPaymentStatus(charge.mpPaymentId);
+        charge.status = mp.status;
+        charge.mpStatus = mp.mpStatus;
+        if (mp.expiresAt) charge.expiresAt = mp.expiresAt;
+        await conn.query("UPDATE charges SET status = ?, mp_status = ?, expires_at = ? WHERE id = ?", [
+          charge.status,
+          charge.mpStatus,
+          charge.expiresAt,
+          charge.id
+        ]);
+      } catch {
+        // Mantem status local se API externa estiver indisponivel.
+      }
+    }
 
     if (charge.status === "pending" && Date.now() > new Date(charge.expiresAt).getTime()) {
       await conn.query("UPDATE charges SET status = 'expired' WHERE id = ?", [charge.id]);
@@ -615,12 +790,29 @@ async function confirmChargePayment(chargeId) {
     const totalTickets = Math.max(1, Math.min(99999, Number(config?.totalTickets || 99999)));
 
     const [chargeRows] = await conn.query(
-      "SELECT id, transaction_id AS transactionId, user_id AS userId, amount, quantity, status, expires_at AS expiresAt FROM charges WHERE id = ? LIMIT 1 FOR UPDATE",
+      "SELECT id, transaction_id AS transactionId, user_id AS userId, amount, quantity, status, expires_at AS expiresAt, mp_payment_id AS mpPaymentId, mp_status AS mpStatus FROM charges WHERE id = ? LIMIT 1 FOR UPDATE",
       [chargeId]
     );
 
     const charge = chargeRows[0] || null;
     if (!charge) throw new Error("CHARGE_NOT_FOUND");
+
+    if (charge.mpPaymentId && MP_ACCESS_TOKEN) {
+      try {
+        const mp = await getMercadoPagoPaymentStatus(charge.mpPaymentId);
+        charge.status = mp.status;
+        charge.mpStatus = mp.mpStatus;
+        if (mp.expiresAt) charge.expiresAt = mp.expiresAt;
+        await conn.query("UPDATE charges SET status = ?, mp_status = ?, expires_at = ? WHERE id = ?", [
+          charge.status,
+          charge.mpStatus,
+          charge.expiresAt,
+          charge.id
+        ]);
+      } catch {
+        throw new Error("MP_STATUS_UNAVAILABLE");
+      }
+    }
 
     if (charge.status === "pending" && Date.now() > new Date(charge.expiresAt).getTime()) {
       await conn.query("UPDATE charges SET status = 'expired' WHERE id = ?", [charge.id]);
@@ -628,6 +820,8 @@ async function confirmChargePayment(chargeId) {
     }
 
     if (charge.status === "expired") throw new Error("CHARGE_EXPIRED");
+    if (charge.status === "pending") throw new Error("CHARGE_PENDING");
+    if (charge.status !== "paid") throw new Error("CHARGE_NOT_APPROVED");
 
     const [existingRows] = await conn.query(
       `SELECT id, charge_id AS chargeId, transaction_id AS transactionId, user_id AS userId, user_name AS userName,
@@ -645,8 +839,6 @@ async function confirmChargePayment(chargeId) {
       if (charge.status !== "paid") await conn.query("UPDATE charges SET status = 'paid' WHERE id = ?", [charge.id]);
       return { ...existing, tickets: ticketRows.map((row) => row.ticket) };
     }
-
-    if (charge.status !== "pending") throw new Error("CHARGE_INVALID_STATUS");
 
     const [[countRow]] = await conn.query("SELECT COUNT(*) AS soldTickets FROM purchase_tickets");
     const soldTickets = Number(countRow?.soldTickets || 0);
@@ -843,6 +1035,9 @@ async function handleApi(req, res, url) {
       if (error.message === "INSUFFICIENT_TICKETS") {
         return json(res, 409, { error: "Quantidade indisponivel. Limite de numeros da rifa atingido." });
       }
+      if (error.message === "MP_CREATE_PIX_FAILED") {
+        return json(res, 502, { error: "Falha ao gerar PIX no Mercado Pago." });
+      }
       throw error;
     }
   }
@@ -862,8 +1057,13 @@ async function handleApi(req, res, url) {
     } catch (error) {
       if (error.message === "CHARGE_NOT_FOUND") return notFound(res);
       if (error.message === "CHARGE_EXPIRED") return json(res, 409, { error: "Cobranca expirada." });
+      if (error.message === "CHARGE_PENDING") return json(res, 409, { error: "Pagamento ainda pendente." });
+      if (error.message === "CHARGE_NOT_APPROVED") return json(res, 409, { error: "Pagamento nao aprovado." });
       if (error.message === "CHARGE_INVALID_STATUS") return json(res, 409, { error: "Cobranca em estado invalido." });
       if (error.message === "SOLD_OUT") return json(res, 409, { error: "Nao ha numeros suficientes disponiveis para concluir esta compra." });
+      if (error.message === "MP_STATUS_UNAVAILABLE") {
+        return json(res, 502, { error: "Nao foi possivel validar o pagamento no Mercado Pago." });
+      }
       throw error;
     }
   }
