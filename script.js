@@ -424,6 +424,17 @@ async function showPayment(user) {
     pixCodeInput.value = charge.pixCode;
     qrImage.src = charge.qrCodeImage;
 
+    // Debug para validar PIX no browser durante testes.
+    console.log("[PIX][charge]", {
+      chargeId: charge.id,
+      transactionId: charge.transactionId,
+      expiresInSeconds: charge.expiresInSeconds,
+      pixCopyPaste: charge.pixCode,
+      qrCodeImage: charge.qrCodeImage
+    });
+    console.log("[PIX][copy-paste]", charge.pixCode);
+    console.log("[PIX][qr]", charge.qrCodeImage);
+
     purchaseName.textContent = user.name;
     purchasePhone.textContent = user.phone;
     purchaseDate.textContent = new Date().toLocaleString("pt-BR", {
