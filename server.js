@@ -103,6 +103,13 @@ async function mercadoPagoRequest(pathname, options = {}) {
 
 async function createMercadoPagoPixPayment({ externalReference, amount, description, buyer }) {
   const cpf = onlyDigits(buyer.cpf || "");
+  const isProductionToken = MP_ACCESS_TOKEN.startsWith("APP_USR-");
+  if (isProductionToken && cpf.length !== 11) {
+    const error = new Error("PAYER_CPF_REQUIRED");
+    error.code = "PAYER_CPF_REQUIRED";
+    throw error;
+  }
+
   const buyerEmail = normalizeEmail(buyer.email);
   const email = isValidEmail(buyerEmail)
     ? buyerEmail
@@ -742,9 +749,12 @@ async function createCharge({ amount, quantity, buyer, description }) {
         if (
           error.code === "MP_API_ERROR" ||
           error.code === "MP_NOT_CONFIGURED" ||
+          error.code === "PAYER_CPF_REQUIRED" ||
           error.code === "PIX_DATA_MISSING"
         ) {
-          throw new Error("MP_CREATE_PIX_FAILED");
+          const wrapped = new Error("MP_CREATE_PIX_FAILED");
+          wrapped.details = error.details || { message: error.message, code: error.code || "UNKNOWN" };
+          throw wrapped;
         }
         throw error;
       }
@@ -1062,8 +1072,8 @@ async function handleApi(req, res, url) {
       }
       if (error.message === "MP_CREATE_PIX_FAILED") {
         return json(res, 502, {
-          error:
-            "Falha ao gerar PIX no Mercado Pago. Verifique MP_ACCESS_TOKEN e um e-mail de pagador valido (MP_PAYER_EMAIL)."
+          error: "Falha ao gerar PIX no Mercado Pago.",
+          details: error.details || null
         });
       }
       throw error;
