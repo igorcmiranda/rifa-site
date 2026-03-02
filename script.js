@@ -545,30 +545,14 @@ phoneContinue.addEventListener("click", async () => {
   try {
     const data = await apiRequest(`${API.userFind}?phone=${encodeURIComponent(phone)}`);
     if (data.user) {
-      const user = data.user;
-      const hasCpf = onlyDigits(user.cpf || "").length === 11;
-      const hasEmail = Boolean(normalizeEmail(user.email || ""));
-
-      if (hasCpf && hasEmail) {
-        activeUser = user;
-        existingName.textContent = user.name || "Cliente";
-        existingPhone.textContent = user.phone || phone;
-        setStep("stepExisting");
-        return;
-      }
-
-      // Usuario existe, mas sem dados obrigatorios para gerar PIX em producao.
-      nameInput.value = user.name || "";
-      phoneConfirmInput.value = maskPhone(user.phone || phone);
-      cpfInput.value = maskCpf(user.cpf || "");
-      emailInput.value = user.email || "";
-      setCheckoutMessage("Complete seu cadastro para concluir a reserva.", "pending");
-      setStep("stepRegister");
+      activeUser = data.user;
+      existingName.textContent = data.user.name || "Cliente";
+      existingPhone.textContent = data.user.phone || phone;
+      setStep("stepExisting");
       return;
     }
 
     phoneConfirmInput.value = maskPhone(phone);
-    setCheckoutMessage("");
     setStep("stepRegister");
   } catch (error) {
     alert(error.message || "Erro ao consultar usuario.");

@@ -14,7 +14,6 @@ const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_
 const MP_API_BASE = process.env.MP_API_BASE || "https://api.mercadopago.com";
 const MP_NOTIFICATION_URL = process.env.MP_NOTIFICATION_URL || "";
 const MP_PAYER_EMAIL = process.env.MP_PAYER_EMAIL || "";
-const MP_DEBUG = String(process.env.MP_DEBUG || "true").toLowerCase() === "true";
 
 function onlyDigits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -74,15 +73,6 @@ function mapMpStatus(mpStatus, expirationDate) {
   return "pending";
 }
 
-function logMpStep(step, data = {}) {
-  if (!MP_DEBUG) return;
-  try {
-    console.log(`[MP][${step}]`, JSON.stringify(data));
-  } catch {
-    console.log(`[MP][${step}]`, data);
-  }
-}
-
 async function mercadoPagoRequest(pathname, options = {}) {
   if (!MP_ACCESS_TOKEN) {
     throw new Error("MP_NOT_CONFIGURED");
@@ -101,14 +91,6 @@ async function mercadoPagoRequest(pathname, options = {}) {
   });
 
   const data = await response.json().catch(() => ({}));
-  logMpStep("http", {
-    method: options.method || "GET",
-    url: `${MP_API_BASE}${pathname}`,
-    status: response.status,
-    ok: response.ok,
-    response: data
-  });
-
   if (!response.ok) {
     const cause = data?.message || data?.error || "Falha na API do Mercado Pago.";
     const error = new Error(cause);
@@ -121,13 +103,6 @@ async function mercadoPagoRequest(pathname, options = {}) {
 
 async function createMercadoPagoPixPayment({ externalReference, amount, description, buyer }) {
   const cpf = onlyDigits(buyer.cpf || "");
-  const isProductionToken = MP_ACCESS_TOKEN.startsWith("APP_USR-");
-  if (isProductionToken && cpf.length !== 11) {
-    const error = new Error("PAYER_CPF_REQUIRED");
-    error.code = "PAYER_CPF_REQUIRED";
-    throw error;
-  }
-
   const buyerEmail = normalizeEmail(buyer.email);
   const email = isValidEmail(buyerEmail)
     ? buyerEmail
@@ -159,14 +134,6 @@ async function createMercadoPagoPixPayment({ externalReference, amount, descript
     payload.notification_url = MP_NOTIFICATION_URL;
   }
 
-  logMpStep("create-payment:request", {
-    externalReference,
-    amount: payload.transaction_amount,
-    description,
-    payer: payload.payer,
-    hasNotificationUrl: Boolean(payload.notification_url)
-  });
-
   const payment = await mercadoPagoRequest("/v1/payments", {
     method: "POST",
     headers: {
@@ -179,15 +146,6 @@ async function createMercadoPagoPixPayment({ externalReference, amount, descript
   const qrCodeBase64 = payment?.point_of_interaction?.transaction_data?.qr_code_base64 || "";
   const qrCodeImage = qrCodeBase64 ? `data:image/png;base64,${qrCodeBase64}` : "";
   const expirationDate = payment?.date_of_expiration || null;
-
-  logMpStep("create-payment:response", {
-    mpPaymentId: payment?.id || null,
-    status: payment?.status || null,
-    statusDetail: payment?.status_detail || null,
-    hasQrCode: Boolean(qrCode),
-    hasQrCodeBase64: Boolean(qrCodeBase64),
-    expirationDate
-  });
 
   if (!qrCode || !qrCodeImage) {
     const error = new Error("PIX_DATA_MISSING");
@@ -211,15 +169,8 @@ async function createMercadoPagoPixPayment({ externalReference, amount, descript
 }
 
 async function getMercadoPagoPaymentStatus(mpPaymentId) {
-  logMpStep("get-payment:request", { mpPaymentId });
   const payment = await mercadoPagoRequest(`/v1/payments/${encodeURIComponent(mpPaymentId)}`);
   const expirationDate = payment?.date_of_expiration || null;
-  logMpStep("get-payment:response", {
-    mpPaymentId: payment?.id || mpPaymentId,
-    status: payment?.status || null,
-    statusDetail: payment?.status_detail || null,
-    expirationDate
-  });
   return {
     mpStatus: String(payment.status || "pending"),
     status: mapMpStatus(payment.status, expirationDate),
@@ -737,18 +688,6 @@ async function getAdminGroupedPurchases() {
 
 async function createCharge({ amount, quantity, buyer, description }) {
   return withTransaction(async (conn) => {
-    logMpStep("charge:start", {
-      amount,
-      quantity,
-      description,
-      buyer: {
-        name: buyer?.name || "",
-        phone: buyer?.phone || "",
-        cpfLength: onlyDigits(buyer?.cpf || "").length,
-        email: buyer?.email || ""
-      }
-    });
-
     const stats = await getRaffleStats(conn);
     if (stats.remainingTickets < quantity) {
       throw new Error("INSUFFICIENT_TICKETS");
@@ -799,21 +738,13 @@ async function createCharge({ amount, quantity, buyer, description }) {
         charge.expiresAt = mpCharge.expiresAt || charge.expiresAt;
         charge.mpPaymentId = mpCharge.mpPaymentId;
         charge.mpStatus = mpCharge.mpStatus;
-        logMpStep("charge:mp-created", {
-          chargeId: charge.id,
-          mpPaymentId: charge.mpPaymentId,
-          status: charge.status
-        });
       } catch (error) {
         if (
           error.code === "MP_API_ERROR" ||
           error.code === "MP_NOT_CONFIGURED" ||
-          error.code === "PAYER_CPF_REQUIRED" ||
           error.code === "PIX_DATA_MISSING"
         ) {
-          const wrapped = new Error("MP_CREATE_PIX_FAILED");
-          wrapped.details = error.details || { message: error.message, code: error.code || "UNKNOWN" };
-          throw wrapped;
+          throw new Error("MP_CREATE_PIX_FAILED");
         }
         throw error;
       }
@@ -839,19 +770,11 @@ async function createCharge({ amount, quantity, buyer, description }) {
       ]
     );
 
-    logMpStep("charge:db-saved", {
-      chargeId: charge.id,
-      transactionId: charge.transactionId,
-      status: charge.status,
-      mpPaymentId: charge.mpPaymentId || null
-    });
-
     return charge;
   });
 }
 
 async function getChargeStatus(chargeId) {
-  logMpStep("charge-status:start", { chargeId });
   return withTransaction(async (conn) => {
     const [rows] = await conn.query(
       "SELECT id, status, expires_at AS expiresAt, mp_payment_id AS mpPaymentId, mp_status AS mpStatus FROM charges WHERE id = ? LIMIT 1 FOR UPDATE",
@@ -874,7 +797,6 @@ async function getChargeStatus(chargeId) {
         ]);
       } catch {
         // Mantem status local se API externa estiver indisponivel.
-        logMpStep("charge-status:mp-failed", { chargeId, mpPaymentId: charge.mpPaymentId });
       }
     }
 
@@ -888,7 +810,6 @@ async function getChargeStatus(chargeId) {
 }
 
 async function confirmChargePayment(chargeId) {
-  logMpStep("confirm:start", { chargeId });
   return withTransaction(async (conn) => {
     const [[config]] = await conn.query("SELECT total_tickets AS totalTickets FROM raffle_config WHERE id = 1 FOR UPDATE");
     const totalTickets = Math.max(1, Math.min(99999, Number(config?.totalTickets || 99999)));
@@ -914,7 +835,6 @@ async function confirmChargePayment(chargeId) {
           charge.id
         ]);
       } catch {
-        logMpStep("confirm:mp-status-unavailable", { chargeId, mpPaymentId: charge.mpPaymentId });
         throw new Error("MP_STATUS_UNAVAILABLE");
       }
     }
@@ -1000,11 +920,6 @@ async function confirmChargePayment(chargeId) {
     }
 
     await conn.query("UPDATE charges SET status = 'paid' WHERE id = ?", [charge.id]);
-    logMpStep("confirm:success", {
-      chargeId: charge.id,
-      purchaseId,
-      ticketsCount: tickets.length
-    });
 
     return {
       id: purchaseId,
@@ -1147,8 +1062,8 @@ async function handleApi(req, res, url) {
       }
       if (error.message === "MP_CREATE_PIX_FAILED") {
         return json(res, 502, {
-          error: "Falha ao gerar PIX no Mercado Pago.",
-          details: error.details || null
+          error:
+            "Falha ao gerar PIX no Mercado Pago. Verifique MP_ACCESS_TOKEN e um e-mail de pagador valido (MP_PAYER_EMAIL)."
         });
       }
       throw error;
