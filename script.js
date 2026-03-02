@@ -400,7 +400,7 @@ function renderAdmin(users, stats) {
 
 async function createPixCharge(user) {
   const total = quantity * ticketPrice;
-  return apiRequest(API.pixCharge, {
+  const response = await apiRequest(API.pixCharge, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -416,6 +416,10 @@ async function createPixCharge(user) {
       }
     })
   });
+  if (!response?.id || !response?.pixCode || !response?.qrCodeImage) {
+    throw new Error("API retornou cobranca incompleta.");
+  }
+  return response;
 }
 
 async function showPayment(user) {
@@ -442,7 +446,14 @@ async function showPayment(user) {
     };
 
     pixCodeInput.value = charge.pixCode;
-    qrImage.src = charge.qrCodeImage;
+    qrImage.src = "";
+    const qrSource = String(charge.qrCodeImage || "");
+    if (qrSource.startsWith("data:")) {
+      qrImage.src = `${qrSource}#t=${Date.now()}`;
+    } else {
+      const sep = qrSource.includes("?") ? "&" : "?";
+      qrImage.src = `${qrSource}${sep}t=${Date.now()}`;
+    }
 
     // Debug para validar PIX no browser durante testes.
     console.log("[PIX][charge]", {

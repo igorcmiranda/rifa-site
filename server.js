@@ -1241,7 +1241,12 @@ async function serveStatic(req, res, url) {
 
   try {
     const data = await fs.readFile(filePath);
-    res.writeHead(200, { "Content-Type": contentTypeByExt(filePath) });
+    res.writeHead(200, {
+      "Content-Type": contentTypeByExt(filePath),
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
+      Expires: "0"
+    });
     res.end(data);
   } catch {
     notFound(res);
